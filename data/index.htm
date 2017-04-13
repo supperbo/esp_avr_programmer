@@ -1,0 +1,237 @@
+<html>
+<head>
+<title>Arduino Programmer</title>
+
+<style>
+
+	#W200 { display: inline-block; width: 200px; font-size: 14px; }
+	#W100 { display: inline-block; width: 100px; font-size: 14px; }
+	#W50 { display: inline-block; width: 50px; font-size: 14px; }
+	#W200B { display: inline-block; width: 200px; font-size: 14px; border-bottom: 1px solid black; margin-bottom:3px; margin-top:3px; }
+	#W100B { display: inline-block; width: 100px; font-size: 14px; border-bottom: 1px solid black; margin-bottom:3px; margin-top:3px; }
+	#W50B { display: inline-block; width: 50px; font-size: 14px; border-bottom: 1px solid black; margin-bottom:3px; margin-top:3px; }
+	#Commands { border-bottom: 1px solid black; display: inline-block; width: 120px; font-size: 14px; padding-left:30px; margin-bottom:3px;margin-top:3px; }
+
+	#Row { display: inline-block; margin-left: 5px; margin-right: 5px; }
+
+	#Table { display: table; }
+	#TRow { display: table-row; }
+	#TCellNormal { display: table-cell; width: 40px; border-bottom: 1px solid black; }
+	#TCellSmall { display: table-cell; width: 25px; border-bottom: 1px solid black; }
+
+</style>
+
+
+
+</head>
+
+<body>
+
+<div id="uploadMain" style="border: 1px solid black; width: 460px; font-size: 0; margin-bottom: 5px">
+	<div id="Row">
+		<div id="W200"><input type="file" id="file-input" /></div>
+		<div id="W50">&nbsp;</div>
+		<div id="W100" name="uploadDiv">Upload</div>
+		<div id="W100" name="cancelDiv">Cancel</div>
+	</div>
+</div>
+
+<div id="FilesMain" style="border: 1px solid black; width: 460px; font-size: 0;"></div>
+
+</body>
+
+<script>
+
+	var fileData = null;
+	var filename = null;
+	//var deviceUrl = "http://192.168.1.32";	
+	var deviceUrl = "http://" + location.host;
+	function sendData() {
+
+		var http = new XMLHttpRequest();
+		var url = deviceUrl + "/upload&"+ filename
+		var params = fileData;
+		http.open("POST", url, true);
+		http.send(params);
+	}
+
+	function uploadFile() {
+		sendData();
+		cancelUpload();
+		setTimeout(getFileList, 2000);
+	}
+
+	function readSingleFile(e) {
+		var file = e.target.files[0];
+		filename = file.name;	
+		if (!file) { return; }
+		var reader = new FileReader();
+		reader.onload = function(e) {
+			fileData = e.target.result;		
+		};
+		reader.readAsText(file);
+		
+		enUploadLinks();
+	}
+
+	function getFileList() {
+		var http = new XMLHttpRequest();
+		var url = deviceUrl + "/files";
+	
+		http.open("GET", url, true);
+		http.setRequestHeader("Content-type", "application/x-www-form-urlencoded");
+		http.onreadystatechange = function() {
+			if(http.readyState == 4 && http.status == 200) {
+				showFiles(http.responseText);
+    		} else {
+				showFilesError();
+			}
+		}
+		
+		http.send();
+	}
+
+	function deleteFile(filename) {
+		var http = new XMLHttpRequest();
+		var url = deviceUrl + "/delete&" + filename;
+	
+		http.open("GET", url, true);
+		http.setRequestHeader("Content-type", "application/x-www-form-urlencoded");
+		http.onreadystatechange = function() {
+			if(http.readyState == 4 && http.status == 200) {
+				showFiles(http.responseText);
+    		} else {
+				showFilesError();
+			}
+		}
+		http.send();
+	}	
+
+	function flashFile(filename) {
+		var http = new XMLHttpRequest();
+		var url = deviceUrl + "/flash&" + filename;
+	
+		http.open("GET", url, true);
+		http.setRequestHeader("Content-type", "application/x-www-form-urlencoded");
+		http.onreadystatechange = function() {
+			if(http.readyState == 4 && http.status == 200) {
+				showFiles(http.responseText);
+    		}
+		}
+		http.send();
+	}	
+
+	function getFileRow(filename, filesize) {
+		var row = document.createElement("div");
+		row.id = "Row";
+		row.appendChild(getTableCell(filename, "W200"));
+		row.appendChild(getTableCell(filesize, "W100"));
+		row.appendChild(getCmdOption("Flash", "W50", filename));
+		row.appendChild(getCmdOption("&nbsp;", "W50", filename));
+		row.appendChild(getCmdOption("Delete", "W50", filename));
+
+		return row;
+	}	
+
+	function getTextRow(htmlArray, idArray) {
+		var row = document.createElement("div");
+		row.id = "Row";
+		for(var x = 0; x < htmlArray.length; x++) {
+			row.appendChild(getTableCell(htmlArray[x], idArray[x]));			
+		}
+		return row;
+	}
+
+	function showFilesError() {
+		document.getElementById('FilesMain').innerHTML = "ESP connection error.";		
+	}	
+
+	function showFiles(cvsList) {
+		var lines = cvsList.split("\n");
+		if(lines.length == 0){
+			document.getElementById('FilesMain').innerHTML = "";
+			return;		
+		}
+
+		document.getElementById('FilesMain').innerHTML = "";		
+
+		var row = getTextRow(["<b>Name</b>","<b>Size</b>","<b>Commands</b>"], ["W200B","W100B","Commands"]);
+		document.getElementById('FilesMain').appendChild(row);
+		
+		var totalSize = 0;
+		var fileCount = 0;
+		for(var x = 0; x < lines.length; x++){
+			if(lines[x].length < 5) {
+				continue;			
+			}
+			fileCount++;
+			var elements = lines[x].split(";");
+			totalSize += parseInt(elements[1]);
+			var row = getFileRow(elements[0], elements[1]);
+			document.getElementById('FilesMain').appendChild(row);		
+		}
+
+		var row = getTextRow(["","","","",""], ["W200B","W100B","W50B","W50B","W50B"]);
+		document.getElementById('FilesMain').appendChild(row);
+
+		var row = getTextRow(["<b>Files: " + fileCount + "</b>","<b>" + totalSize + "</b>","&nbsp;","&nbsp;","&nbsp;"], ["W200","W100","W50","W50","W50"]);
+		document.getElementById('FilesMain').appendChild(row);
+		
+	}
+
+	function getCmdOption(innerHTML, id, filename) {
+		var cell = document.createElement("div");
+		cell.innerHTML = innerHTML;
+		cell.name = name;
+		if(innerHTML == "Delete") {
+			cell.addEventListener('click', function () { deleteFile(filename);}, false );
+			cell.style.color = "Blue";
+			cell.style.cursor = "Pointer";
+		} else if(innerHTML == "Flash") {
+			cell.addEventListener('click', function () { flashFile(filename);}, false );
+			cell.style.color = "Blue";
+			cell.style.cursor = "Pointer";
+		} else if(innerHTML == "&nbsp;") {
+			cell.onclick = function () { };
+		} 
+		cell.id = id;
+		return cell;
+	}	
+
+	function getTableCell(innerHTML, id) {
+		var cell = document.createElement("div");
+		cell.innerHTML = innerHTML;
+		cell.id = id;
+		return cell;
+	}	
+
+	function enUploadLinks() {
+		document.getElementsByName('uploadDiv')[0].innerHTML = "Upload";
+		document.getElementsByName('uploadDiv')[0].style.color = "Blue";
+		document.getElementsByName('uploadDiv')[0].style.cursor = "Pointer";
+		document.getElementsByName('uploadDiv')[0].addEventListener('click', uploadFile, false);		
+
+		document.getElementsByName('cancelDiv')[0].innerHTML = "Cancel";
+		document.getElementsByName('cancelDiv')[0].style.color = "Blue";
+		document.getElementsByName('cancelDiv')[0].style.cursor = "Pointer";
+		document.getElementsByName('cancelDiv')[0].addEventListener('click', cancelUpload, false);
+	}	
+	
+	function cancelUpload() {
+		document.getElementById("file-input").value = "";
+		
+		document.getElementsByName('uploadDiv')[0].innerHTML = "Upload";
+		document.getElementsByName('uploadDiv')[0].style.color = "Black";
+		document.getElementsByName('uploadDiv')[0].style.cursor = "Auto";
+		
+		document.getElementsByName('cancelDiv')[0].innerHTML = "Cancel";
+		document.getElementsByName('cancelDiv')[0].style.color = "Black";
+		document.getElementsByName('cancelDiv')[0].style.cursor = "Auto";
+	}	
+
+	document.getElementById('file-input').addEventListener('change', readSingleFile, false);
+
+	window.onload = function () { getFileList(); };
+</script>
+
+</html>
