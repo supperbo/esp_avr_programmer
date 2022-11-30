@@ -69,7 +69,7 @@ void IntelHexParse::GetLoadAddress(byte* hexline) {
   
 }
 
-byte* IntelHexParse::GetData(byte* hexline, int len) {
+void IntelHexParse::GetData(byte* hexline, int len) {
 
   int start = 9;
   int end = (len * 2) + start;
